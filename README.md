@@ -13,7 +13,7 @@ We strive to adhere to some basic principles in this document.  We believe that 
 2.  Definitions should be independent of the host environment (e.g., Node.js, the browser).
 3.  Constructs should enhance JavaScript programmers' understanding of async code flow & async boundaries.
 4.  Model should allow for simplified reasoning about async code execution.
-5.  Resulting Data Structures and APIs and should support solving common "async understanding" use cases (e.g., long stack traces, continuation local storage, visualizations, async error propogation, user-space queueing...).
+5.  Resulting Data Structures and APIs should support solving common "async understanding" use cases (e.g., long stack traces, continuation local storage, visualizations, async error propogation, user-space queueing...).
 6.  It should be straightforward to implement this model at any API layer (i.e., VM, host or "monkey-patched").
 
 ## A Simple Example
@@ -26,7 +26,7 @@ function myLoggingAPI(s) { x(s); }
 function f1() {
     let i = 0;
     let interval = setInterval(function f2() {
-        if ( i < 2) {
+        if (i < 2) {
             myLoggingAPI(`i is ${i}`);
             ++i;
         } else {
@@ -49,7 +49,7 @@ Let's give these three concepts some names and some initial definitions:
 
    - An **Async API** - is a function that accepts another function `cb` as a parameter, and `cb` is enqueued and invoked at some later point in time.
    - A **Continuation** is a special variant of a JavaScript function that is passed into an **Async API**.  It retains a link to the "async context" in which it was created.  Upon invocation, it will establish a new "async context", and will provide a "logical continuation" of the "async context" in which it was created.  In the example above, `f2` is a **Continuation**.
-  -  A **Context** is a specific structure that is created when a **Continuation** is invoked. A **Context** is *active* for the *period of time* where a `continuation`'s frame is on the stack.  As soon as the continuation frame pops off the stack, then that **Context** is completed. Note that a `continuation` instance can have more than one **Context** associated with it.  In our code sample above, there are precisely two **Contexts** associated with invocations of the `continuation` f2. 
+  -  A **Context** is a specific structure that is created when a **Continuation** is invoked. A **Context** is *active* for the *period of time* where a `continuation`'s frame is on the stack (later referred to as executing state).  As soon as the continuation frame pops off the stack, then that **Context** is completed. Note that a `continuation` instance can have more than one **Context** associated with it.  In our code sample above, there are precisely two **Contexts** associated with invocations of the `continuation` f2. 
 
 ## A lower-level view
 
@@ -165,10 +165,10 @@ A `Context` can be in a number of states:
 
 ## Context and Current Context
 For any given stack frame, we define it's  **Context** as that defined by the first `Continuation` below the given frame on the stack.  For example, in the previous diagram, the stack frame of `function x()` has a `Current Context` of `ci3`,
-and the stack frame of  `... host code...` has a "`Current Context` of `ci2`.  We define the **Current Context** as the `Context` of the top frame on the stack. 
+and the stack frame of  `... host code...` has a `Current Context` of `ci2`.  We define the **Current Context** as the `Context` of the top frame on the stack. 
 
 ## Link Context
-We define the **Link Context** of a `Continuation` to be the `Current Context` when a `Continuation` is constructed.   In the example from above, the `continuation` `f2` has a `link context` pointing to `Context` `ci1`.  Generally, this is the `Current Context` when a `Continuation` is passed into a `Continuation Point`.
+We define the **Link Context** of a `Continuation` to be the `Current Context` when a `Continuation` is constructed.   In the example from above, the `continuation` `f2` has a `link context` pointing to `Context` `ci1`.  Generally, this is the `Current Context` when a `Continuation` is passed into a `Continuation Point` (e.g. as a parameter to an Async API).
 
 ## Ready Context
 For promises and async/await structures, we define the **Ready Context** to be the `Current Context` when a "promise reaction job is queued". This is useful when want to understand the series of `Contexts` involved in resolution on a promise chain.
@@ -203,7 +203,7 @@ In our example above, the `Context` associated with `continuation f2()` has as i
 
 ## Crisper Definitions
 
-  - **Continuation** -  a function that, when invoked, creates a new `Context` instance.  Also, it contiains a reference to the Continuation where it was created. Using TypeScript for descriptive purposes, a `Continuation` has the following shape:
+  - **Continuation** -  a function that, when invoked, creates a new `Context` instance.  Also, it contains a reference to the Continuation where it was created. Using TypeScript for descriptive purposes, a `Continuation` has the following shape:
 
     ```TypeScript
     /**
